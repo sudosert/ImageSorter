@@ -1,6 +1,9 @@
 import tkinter
+import threading
+from time import sleep
 from tkinter import *
 from tkinter import filedialog
+from tkinter import messagebox
 import Parser
 
 
@@ -11,11 +14,99 @@ landscapes_var = BooleanVar()
 portraits_var = BooleanVar()
 squares_var = BooleanVar()
 subfolders_var = BooleanVar()
+structure_var = BooleanVar()
+
+continue_updates = True
+
+source_frame = LabelFrame(root, text="Source:")
+source_entry = Entry(source_frame)
+source_entry.config(state="readonly")
+
+output_frame = LabelFrame(root, text="Messages:")
+output_textbox = Text(output_frame, width=29, height=5)
+
+threads = []
 
 
-def select_path():
+def update_output():
+
+    if not continue_updates:
+        return
+
+    global output_textbox
+
+    file_number = Parser.file_number
+    master_list = Parser.master_list
+    portraits_list = Parser.sorted_portraits
+    landscapes_list = Parser.sorted_landscapes
+    squares_list = Parser.sorted_squares
+    bad_list = Parser.bad_files
+
+    output_textbox.delete("1.0", END)
+    if not Parser.master_sort_complete:
+        output_text = "Analyzing file " + str(file_number) + " of " + str(len(master_list)) + "."
+    else:
+        output_text = str(file_number) + " of " + str(len(master_list)) + " files analyzed."
+    if portraits_list:
+        number_of_portraits = str(portraits_list)
+        output_text += "\n" + number_of_portraits + " portrait files sorted."
+    if landscapes_list:
+        number_of_landscapes = str(landscapes_list)
+        output_text += "\n" + number_of_landscapes + " landscape files sorted."
+    if squares_list:
+        number_of_squares = str(squares_list)
+        output_text += "\n" + number_of_squares + " square files sorted."
+    if (not portraits_list and not landscapes_list and not squares_list) and Parser.sorting_complete:
+        output_text += "\nNo files were sorted."
+    if bad_list:
+        number_of_bads = str(len(bad_list))
+        output_text += "\n" + number_of_bads + " files could not be read."
+
+    output_textbox.insert(END, output_text)
+
+
+def select_source_path():
 
     Parser.path = filedialog.askdirectory()
+    # The following lines will update the Source Entry box with the new path but keep it from being edited
+    source_entry.config(state=NORMAL)
+    source_entry.delete(0, END)
+    source_entry.insert(0, Parser.path)
+    source_entry.config(state="readonly")
+
+
+def sort_buttons_on_click():
+
+    #  This function ensures a new thread is started each time the sort buttons is clicked
+
+    local_threads = []
+
+    Parser.continue_sorting = True
+
+    t = threading.Thread(target=Parser.parser_with_subs, args=(subfolders_var.get(), structure_var.get(),
+                                                               portraits_var.get(), landscapes_var.get(),
+                                                               squares_var.get()
+                                                               )
+                         )
+    local_threads.append(t)
+    threads.append(t)
+
+    for thread in local_threads:
+        thread.start()
+        while thread.is_alive():    # Pauses the sorting to update the GUI with current status
+            sleep(0.5)
+            try:
+                root.update()
+            except TclError:    # This error may be invoked when the application is closed during a sort
+                pass
+            update_output()
+
+
+def stop_button_on_click():
+
+    Parser.continue_sorting = False
+    Parser.master_sort_complete = True
+    Parser.sorting_complete = True
 
 
 def construct_form():
@@ -31,15 +122,12 @@ def construct_form():
     options_frame = LabelFrame(root, text="Options:")
     subfolders_checkbox = Checkbutton(options_frame, text="Include Subfolders", var=subfolders_var,
                                       onvalue=True, offvalue=False)
+    preserve_structure_checkbox = Checkbutton(options_frame, text="Preserve Folder Structure", var=structure_var,
+                                              onvalue=True, offvalue=False)
 
-    output_frame = LabelFrame(root, text="Output:")
-    output_textbox = Text(output_frame, width=29, height=5)
-
-    browse_button = Button(root, text="Source Folder", command=select_path)
-    sort_button = Button(root, text="Sort", command=lambda: Parser.parser_with_subs(subfolders_var.get(),
-                                                                                    portraits_var.get(),
-                                                                                    landscapes_var.get(),
-                                                                                    squares_var.get()))
+    browse_button = Button(root, text="Source Folder", command=select_source_path)
+    sort_button = Button(root, text="Sort", command=sort_buttons_on_click)
+    stop_button = Button(root, text="Stop", command=stop_button_on_click)
 
     sort_types_frame.grid(column=0, row=0, columnspan=2, sticky=N+S+W+E, padx=4, pady=2)
     landscapes_checkbox.pack(side=LEFT)
@@ -47,15 +135,37 @@ def construct_form():
     squares_checkbox.pack(side=LEFT)
 
     options_frame.grid(column=0, row=1, sticky=N+S+W+E, padx=4, pady=2)
-    subfolders_checkbox.pack(side=LEFT)
+    subfolders_checkbox.pack()
+    preserve_structure_checkbox.pack()
 
     browse_button.grid(column=0, row=2, padx=4, pady=2)
     sort_button.grid(column=1, row=2, padx=4, pady=2)
+    stop_button.grid(column=2, row=2, padx=4, pady=2)
 
-    output_frame.grid(column=0, row=3, columnspan=2, sticky=N+S+W+E, padx=4, pady=2)
-    output_textbox.pack(padx=2, pady=2)
+    source_frame.grid(column=0, row=3, columnspan=3, stick=N+S+W+E, padx=4, pady=2)
+    source_entry.pack(padx=2, pady=2, fill="both")
+
+    output_frame.grid(column=0, row=4, columnspan=3, sticky=N+S+W+E, padx=4, pady=2)
+    output_textbox.pack(padx=2, pady=2, fill="both")
 
     landscapes_checkbox.select()
     portraits_checkbox.select()
     squares_checkbox.select()
     subfolders_checkbox.select()
+    preserve_structure_checkbox.select()
+
+
+def on_exit():
+
+    global continue_updates
+
+    if not Parser.sorting_complete:
+        if tkinter.messagebox.askokcancel("Sort Still Running", "A sort operation is still ongoing.\nAre you sure you "
+                                                                "wish to exit?"):
+            pass
+        else:
+            return
+
+    Parser.continue_sorting = False
+    continue_updates = False
+    root.destroy()

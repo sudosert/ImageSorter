@@ -1,20 +1,68 @@
 import os
 import os.path
 import shutil
-from os import listdir
 from PIL import Image
 
 path = ""
 
-
 image_file_types = [".jpg", ".jpeg", ".png", ".gif"]
 
 master_list = []
+portraits = []
+landscapes = []
+squares = []
+bad_files = []
+
+sorted_portraits = 0
+sorted_landscapes = 0
+sorted_squares = 0
+
+file_number = 0
+
+master_sort_complete = True
+sorting_complete = True
+continue_sorting = True
 
 
-def sorter(sort_ports, sort_lands, sort_squares):
+def check_and_create_path(file_path):
 
-    global master_list
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+
+
+def copy_file(preserve_structure, current_file, full_path):
+
+    folder_structure = ""
+
+    if preserve_structure:
+        file_name = current_file.strip(path)  # Removes only the source path, leaving the folder structure intact
+
+        # The following 3 lines remove the file name from the string leaving only the folder structure itself
+        split_path = file_name.split("\\")
+        del split_path[-1]
+        folder_structure = "\\".join(split_path)
+
+    else:
+        split_path = current_file.split("\\")
+        file_name = "\\" + split_path[-1]  # Gets last item in path, which should be the file name
+
+    check_and_create_path(full_path + folder_structure)
+    shutil.copyfile(current_file, full_path + file_name)
+
+
+def sorter(preserve_structure, sort_ports, sort_lands, sort_squares):
+
+    global master_list, portraits, landscapes, squares, bad_files
+    global file_number, sorted_portraits, sorted_landscapes, sorted_squares, sorting_complete, master_sort_complete
+
+    master_sort_complete = False
+    sorting_complete = False
+
+    sorted_portraits = 0
+    sorted_landscapes = 0
+    sorted_squares = 0
+
+    file_number = 0
 
     portraits = []
     landscapes = []
@@ -22,6 +70,11 @@ def sorter(sort_ports, sort_lands, sort_squares):
     bad_files = []
 
     for eachFile in master_list:
+
+        if not continue_sorting:
+            return
+
+        file_number += 1
         
         try:
             im = Image.open(eachFile)
@@ -38,52 +91,59 @@ def sorter(sort_ports, sort_lands, sort_squares):
         else:
             squares.append(eachFile)
 
+    master_sort_complete = True
+
     if portraits and sort_ports:
 
-        if not os.path.exists(path + "\\" + "Sorted\\Portraits"):
-            os.makedirs(path + "\\" + "Sorted\\Portraits")
+        full_port_path = path + "\\Sorted\\Portraits"
+
+        check_and_create_path(full_port_path)
 
         for eachFile in portraits:
-            split_path = eachFile.split("\\")
-            only_file_name = split_path[len(split_path) - 1]
-            shutil.copyfile(eachFile, path + "\\" + "Sorted\\Portraits\\" + only_file_name)
 
-        print(str(len(portraits)) + " files sorted into Portraits.")
+            if not continue_sorting:
+                return
+
+            copy_file(preserve_structure, eachFile, full_port_path)
+
+            sorted_portraits += 1
 
     if landscapes and sort_lands:
 
-        if not os.path.exists(path + "\\" + "Sorted\\Landscapes"):
-            os.makedirs(path + "\\" + "Sorted\\Landscapes")
+        full_land_path = path + "\\Sorted\\Landscapes"
+
+        if not os.path.exists(full_land_path):
+            os.makedirs(full_land_path)
 
         for eachFile in landscapes:
-            split_path = eachFile.split("\\")
-            only_file_name = split_path[len(split_path) - 1]
-            shutil.copyfile(eachFile, path + "\\" + "Sorted\\Landscapes\\" + only_file_name)
 
-        print(str(len(landscapes)) + " files sorted into Landscapes.")
+            if not continue_sorting:
+                return
+
+            copy_file(preserve_structure, eachFile, full_land_path)
+
+            sorted_landscapes += 1
 
     if squares and sort_squares:
 
-        if not os.path.exists(path + "\\" + "Sorted\\Squares"):
-            os.makedirs(path + "\\" + "Sorted\\Squares")
+        full_square_path = path + "\\Sorted\\Squares"
+
+        if not os.path.exists(full_square_path):
+            os.makedirs(full_square_path)
 
         for eachFile in squares:
-            split_path = eachFile.split("\\")
-            only_file_name = split_path[len(split_path) - 1]
-            shutil.copyfile(eachFile, path + "\\" + "Sorted\\Squares\\" + only_file_name)
 
-        print(str(len(squares)) + " files sorted into Squares.")
+            if not continue_sorting:
+                return
 
-    if not portraits and not landscapes and not squares:
+            copy_file(preserve_structure, eachFile, full_square_path)
 
-        print("No files were sorted.")
+            sorted_squares += 1
 
-    if bad_files:
-
-        print(str(len(bad_files)) + " files could not be sorted.")
+    sorting_complete = True
 
 
-def parser_with_subs(include_subs, sort_ports, sort_lands, sort_squares):
+def parser_with_subs(include_subs, preserve_structure, sort_ports, sort_lands, sort_squares):
 
     global master_list
 
@@ -98,4 +158,4 @@ def parser_with_subs(include_subs, sort_ports, sort_lands, sort_squares):
         if not include_subs:
             break
 
-    sorter(sort_ports, sort_lands, sort_squares)
+    sorter(preserve_structure, sort_ports, sort_lands, sort_squares)
