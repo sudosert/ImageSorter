@@ -4,6 +4,7 @@ from time import sleep
 from tkinter import *
 from tkinter import filedialog
 from tkinter import messagebox
+from tkinter import ttk
 import Parser
 
 
@@ -15,8 +16,11 @@ portraits_var = BooleanVar()
 squares_var = BooleanVar()
 subfolders_var = BooleanVar()
 structure_var = BooleanVar()
+sort_size_var = BooleanVar()
 
 continue_updates = True
+
+size_sorting_options = ["Larger Than", "Smaller Than", "Exactly"]
 
 source_frame = LabelFrame(root, text="Source:")
 source_entry = Entry(source_frame)
@@ -65,6 +69,11 @@ def update_output():
     output_textbox.insert(END, output_text)
 
 
+def checkbox_option_collector():  # Gather the values of all checkboxes
+    return [subfolders_var.get(), structure_var.get(), portraits_var.get(), landscapes_var.get(), squares_var.get(),
+            sort_size_var.get()]
+
+
 def select_source_path():
 
     Parser.path = filedialog.askdirectory()
@@ -75,18 +84,16 @@ def select_source_path():
     source_entry.config(state="readonly")
 
 
-def sort_buttons_on_click():
+def sort_button_on_click(size_selection, width_height):
 
-    #  This function ensures a new thread is started each time the sort buttons is clicked
+    #  This function ensures a new thread is started each time the sort button is clicked
+    #  A thread is required to ensure the GUI does not freeze during lengthy sorts
 
     local_threads = []
 
     Parser.continue_sorting = True
 
-    t = threading.Thread(target=Parser.parser_with_subs, args=(subfolders_var.get(), structure_var.get(),
-                                                               portraits_var.get(), landscapes_var.get(),
-                                                               squares_var.get()
-                                                               )
+    t = threading.Thread(target=Parser.sorter, args=(checkbox_option_collector(), size_selection, width_height)
                          )
     local_threads.append(t)
     threads.append(t)
@@ -121,12 +128,25 @@ def construct_form():
 
     options_frame = LabelFrame(root, text="Options:")
     subfolders_checkbox = Checkbutton(options_frame, text="Include Subfolders", var=subfolders_var,
-                                      onvalue=True, offvalue=False)
+                                      onvalue=True, offvalue=False, anchor='w')
     preserve_structure_checkbox = Checkbutton(options_frame, text="Preserve Folder Structure", var=structure_var,
-                                              onvalue=True, offvalue=False)
+                                              onvalue=True, offvalue=False, anchor='w')
+
+    advanced_sorts_frame = LabelFrame(root, text="Advanced Sorting:")
+    sort_size_checkbox = Checkbutton(advanced_sorts_frame, text="Sort by Size", var=sort_size_var,
+                                     onvalue=True, offvalue=False)
+    width_label = Label(advanced_sorts_frame, text="W:")
+    width_entry = Entry(advanced_sorts_frame, width=7)
+    height_label = Label(advanced_sorts_frame, text="H:")
+    height_entry = Entry(advanced_sorts_frame, width=7)
 
     browse_button = Button(root, text="Source Folder", command=select_source_path)
-    sort_button = Button(root, text="Sort", command=sort_buttons_on_click)
+    sort_button = Button(root, text="Sort", command=lambda: sort_button_on_click(sort_option_combo.get(),
+                                                                                 (width_entry.get(),
+                                                                                  height_entry.get()
+                                                                                  )
+                                                                                 )
+                         )
     stop_button = Button(root, text="Stop", command=stop_button_on_click)
 
     sort_types_frame.grid(column=0, row=0, columnspan=2, sticky=N+S+W+E, padx=4, pady=2)
@@ -135,14 +155,25 @@ def construct_form():
     squares_checkbox.pack(side=LEFT)
 
     options_frame.grid(column=0, row=1, sticky=N+S+W+E, padx=4, pady=2)
-    subfolders_checkbox.pack()
-    preserve_structure_checkbox.pack()
+    subfolders_checkbox.pack(fill="both")
+    preserve_structure_checkbox.pack(fill="both")
+
+    advanced_sorts_frame.grid(column=1, row=1, columnspan=2, sticky=N+S+W+E, padx=4, pady=2)
+    sort_size_checkbox.pack()
+    sort_option_combo = ttk.Combobox(advanced_sorts_frame, width=15, state="readonly")
+    sort_option_combo['values'] = size_sorting_options
+    sort_option_combo.set("Larger Than")
+    sort_option_combo.pack(padx=4, pady=2)
+    width_label.pack(side=LEFT)
+    width_entry.pack(side=LEFT, padx=(0,4), pady=2)
+    height_label.pack(side=LEFT)
+    height_entry.pack(side=LEFT, padx=(0, 4), pady=2)
 
     browse_button.grid(column=0, row=2, padx=4, pady=2)
     sort_button.grid(column=1, row=2, padx=4, pady=2)
     stop_button.grid(column=2, row=2, padx=4, pady=2)
 
-    source_frame.grid(column=0, row=3, columnspan=3, stick=N+S+W+E, padx=4, pady=2)
+    source_frame.grid(column=0, row=3, columnspan=3, sticky=N+S+W+E, padx=4, pady=2)
     source_entry.pack(padx=2, pady=2, fill="both")
 
     output_frame.grid(column=0, row=4, columnspan=3, sticky=N+S+W+E, padx=4, pady=2)

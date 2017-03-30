@@ -50,7 +50,40 @@ def copy_file(preserve_structure, current_file, full_path):
     shutil.copyfile(current_file, full_path + file_name)
 
 
-def sorter(preserve_structure, sort_ports, sort_lands, sort_squares):
+def directory_parser(include_subs):
+
+    global master_list
+
+    master_list = []
+
+    for directory_paths, directory_names, file_names in os.walk(path):
+        if "Sorted" in directory_paths:
+            continue
+        for eachType in image_file_types:
+            for fileName in [f for f in file_names if f.endswith(eachType)]:
+                master_list.append(os.path.join(directory_paths, fileName))
+        if not include_subs:
+            break
+
+
+def master_sorter(width, height, current_file):
+
+    if width > height:
+        landscapes.append(current_file)
+    elif height > width:
+        portraits.append(current_file)
+    else:
+        squares.append(current_file)
+
+
+def sorter(checkbox_options, size_selection, width_height):
+
+    include_subs, preserve_structure, sort_ports, sort_lands, sort_squares, sort_by_size = checkbox_options
+    size_sort_width, size_sort_height = width_height
+    size_sort_width = int(size_sort_width)
+    size_sort_height = int(size_sort_height)
+
+    directory_parser(include_subs)
 
     global master_list, portraits, landscapes, squares, bad_files
     global file_number, sorted_portraits, sorted_landscapes, sorted_squares, sorting_complete, master_sort_complete
@@ -84,12 +117,18 @@ def sorter(preserve_structure, sort_ports, sort_lands, sort_squares):
 
         width, height = im.size
 
-        if width > height:
-            landscapes.append(eachFile)
-        elif height > width:
-            portraits.append(eachFile)
+        if sort_by_size:
+            if size_selection == "Larger Than":
+                if (width > size_sort_width) and (height > size_sort_height):
+                    master_sorter(width, height, eachFile)
+            elif size_selection == "Smaller Than":
+                if (width < size_sort_width) and (height < size_sort_height):
+                    master_sorter(width, height, eachFile)
+            elif size_selection == "Exactly":
+                if (width == size_sort_width) and (height == size_sort_height):
+                    master_sorter(width, height, eachFile)
         else:
-            squares.append(eachFile)
+            master_sorter(width, height, eachFile)
 
     master_sort_complete = True
 
@@ -142,20 +181,3 @@ def sorter(preserve_structure, sort_ports, sort_lands, sort_squares):
 
     sorting_complete = True
 
-
-def parser_with_subs(include_subs, preserve_structure, sort_ports, sort_lands, sort_squares):
-
-    global master_list
-
-    master_list = []
-
-    for directory_paths, directory_names, file_names in os.walk(path):
-        if "Sorted" in directory_paths:
-            continue
-        for eachType in image_file_types:
-            for fileName in [f for f in file_names if f.endswith(eachType)]:
-                master_list.append(os.path.join(directory_paths, fileName))
-        if not include_subs:
-            break
-
-    sorter(preserve_structure, sort_ports, sort_lands, sort_squares)
